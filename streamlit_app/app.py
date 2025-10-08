@@ -1,4 +1,3 @@
-# app.py - Streamlit front-end for the demo (Cloud-ready)
 import streamlit as st
 import subprocess, os
 
@@ -8,22 +7,28 @@ st.title("AI-assisted Symbolic Execution Demo")
 st.markdown("""
 Upload a small C program. The app will:
 1. compile it,
-2. try to run symbolic execution (mocked on Cloud),
+2. run symbolic execution (mocked on Cloud),
 3. apply a template patch and show the fixed code.
 """)
+
+# Paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # folder of app.py
+SRC_DIR = os.path.join(BASE_DIR, "..", "src")          # path to src folder
+FIND_BUG_MOCK = os.path.join(SRC_DIR, "find_bug_mock.py")
+AUTO_PATCH = os.path.join(SRC_DIR, "auto_patch.py")
 
 uploaded = st.file_uploader("Upload C file (small)", type=["c"])
 if not uploaded:
     st.info("Upload a C file (use the provided `bugprog.c` for demo).")
 else:
-    # save uploaded file in current folder
-    src_path = "bugprog.c"
+    src_path = os.path.join(BASE_DIR, "bugprog.c")
     with open(src_path, "wb") as f:
         f.write(uploaded.read())
+
     st.subheader("Uploaded source")
     st.code(open(src_path).read(), language="c")
 
-    # compile
+    # Compile
     st.subheader("Compiling program")
     compile_proc = subprocess.run(["gcc", "-o", "bugprog", src_path], capture_output=True, text=True)
     if compile_proc.returncode != 0:
@@ -33,27 +38,28 @@ else:
 
         # Run symbolic execution mock
         st.subheader("Running symbolic execution (mock)")
-        mock_path = "../src/find_bug_mock.py"  # Cloud path
-        if os.path.exists(mock_path):
-            mock = subprocess.run(["python3", mock_path], capture_output=True, text=True)
+        if os.path.exists(FIND_BUG_MOCK):
+            mock = subprocess.run(["python3", FIND_BUG_MOCK], capture_output=True, text=True)
             st.text("Mock finder output:\n" + mock.stdout)
         else:
-            st.error(f"Mock finder script not found at {mock_path}")
+            st.error(f"Mock finder script not found at {FIND_BUG_MOCK}")
 
-        # apply template patch
+        # Apply template patch
         st.subheader("Applying automatic template patch")
-        patch_path = "../src/auto_patch.py"  # Cloud path
-        if os.path.exists(patch_path):
-            patch_proc = subprocess.run(["python3", patch_path, src_path, "bugprog_fixed.c"], capture_output=True, text=True)
+        fixed_path = os.path.join(BASE_DIR, "bugprog_fixed.c")
+        if os.path.exists(AUTO_PATCH):
+            patch_proc = subprocess.run(["python3", AUTO_PATCH, src_path, fixed_path],
+                                        capture_output=True, text=True)
             st.text(patch_proc.stdout + patch_proc.stderr)
 
-            if os.path.exists("bugprog_fixed.c"):
+            if os.path.exists(fixed_path):
                 st.success("Patch applied. Fixed code:")
-                st.code(open("bugprog_fixed.c").read(), language="c")
+                st.code(open(fixed_path).read(), language="c")
 
-                # compile fixed and run with input 0
+                # Compile fixed program
                 st.subheader("Compile and run fixed program with input '0'")
-                comp2 = subprocess.run(["gcc", "-o", "bugprog_fixed", "bugprog_fixed.c"], capture_output=True, text=True)
+                comp2 = subprocess.run(["gcc", "-o", "bugprog_fixed", fixed_path],
+                                       capture_output=True, text=True)
                 if comp2.returncode == 0:
                     run = subprocess.run(["./bugprog_fixed", "0"], capture_output=True, text=True)
                     st.text("Program output:\n" + run.stdout + run.stderr)
@@ -62,4 +68,4 @@ else:
             else:
                 st.error("Patch did not generate bugprog_fixed.c")
         else:
-            st.error(f"Auto patch script not found at {patch_path}")
+            st.error(f"Auto patch script not found at {AUTO_PATCH}")
