@@ -36,32 +36,24 @@ def login_user(username, password):
     return data
 
 # --------------------------
-# Streamlit UI Config
+# Streamlit Config
 # --------------------------
 st.set_page_config(page_title="AI-assisted Symbolic Execution", layout="wide")
-
 create_usertable()
-menu = ["Login", "SignUp"]
-choice = st.sidebar.selectbox("Menu", menu)
 
-# --------------------------
-# SIGNUP PAGE
-# --------------------------
-if choice == "SignUp":
-    st.subheader("Create New Account 🔐")
-    new_user = st.text_input("Username")
-    new_password = st.text_input("Password", type='password')
-
-    if st.button("Signup"):
-        add_userdata(new_user, make_hashes(new_password))
-        st.success("✅ Account created successfully!")
-        st.info("Go to Login Menu to log in.")
+# Initialize session variables
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
+if "page" not in st.session_state:
+    st.session_state.page = "login"
 
 # --------------------------
 # LOGIN PAGE
 # --------------------------
-elif choice == "Login":
-    st.subheader("Login to Your Account")
+def login_page():
+    st.title("🔐 Login to AI-Assisted Symbolic Execution App")
     username = st.text_input("Username")
     password = st.text_input("Password", type='password')
 
@@ -70,17 +62,46 @@ elif choice == "Login":
         result = login_user(username, hashed_pswd)
 
         if result:
-            st.session_state['logged_in'] = True
-            st.session_state['username'] = username
-            st.success(f"Welcome {username} 👋")
+            st.session_state.logged_in = True
+            st.session_state.username = username
+            st.session_state.page = "main"
+            st.success(f"✅ Welcome {username}!")
+            st.experimental_rerun()
         else:
             st.warning("❌ Incorrect Username/Password")
 
+    st.markdown("Don't have an account?")
+    if st.button("Go to Sign Up"):
+        st.session_state.page = "signup"
+        st.experimental_rerun()
+
 # --------------------------
-# MAIN APP (after login)
+# SIGNUP PAGE
 # --------------------------
-if 'logged_in' in st.session_state and st.session_state['logged_in']:
+def signup_page():
+    st.title("📝 Create a New Account")
+    new_user = st.text_input("Choose a Username")
+    new_password = st.text_input("Choose a Password", type='password')
+
+    if st.button("Sign Up"):
+        add_userdata(new_user, make_hashes(new_password))
+        st.success("✅ Account created successfully!")
+        st.info("Now go to Login to access the app.")
+    if st.button("Go to Login"):
+        st.session_state.page = "login"
+        st.experimental_rerun()
+
+# --------------------------
+# MAIN APP PAGE
+# --------------------------
+def main_app():
     st.title("🤖 AI-assisted Symbolic Execution Demo")
+    st.write(f"Welcome, **{st.session_state.username}** 👋")
+
+    if st.button("Logout"):
+        st.session_state.logged_in = False
+        st.session_state.page = "login"
+        st.experimental_rerun()
 
     st.markdown("""
     Upload a small C program. The app will:
@@ -148,6 +169,12 @@ if 'logged_in' in st.session_state and st.session_state['logged_in']:
             else:
                 st.error(f"Auto patch script not found at {AUTO_PATCH}")
 
-    if st.button("Logout"):
-        st.session_state['logged_in'] = False
-        st.experimental_rerun()
+# --------------------------
+# PAGE ROUTING
+# --------------------------
+if st.session_state.page == "login":
+    login_page()
+elif st.session_state.page == "signup":
+    signup_page()
+elif st.session_state.page == "main":
+    main_app()
