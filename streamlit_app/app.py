@@ -47,6 +47,7 @@ def login_page():
         if check_user(user, password):
             st.session_state["user"] = user
             st.success(f"✅ Welcome {user}!")
+            st.session_state["page"] = "app"
             st.rerun()
         else:
             st.error("Invalid username or password")
@@ -86,7 +87,7 @@ def symbolic_execution_app():
     st.markdown("""
     Upload a small C program. The app will:
     1. Compile it
-    2. Run symbolic execution (mocked on Cloud)
+    2. Run symbolic execution (mocked)
     3. Apply a template patch and show the fixed code.
     """)
 
@@ -96,11 +97,21 @@ def symbolic_execution_app():
         st.session_state["page"] = "login"
         st.rerun()
 
+    # Get reliable paths for all environments
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     SRC_DIR = os.path.join(BASE_DIR, "src")
+
+    # In case Streamlit runs from a different working directory
+    if not os.path.exists(SRC_DIR):
+        SRC_DIR = os.path.join(os.path.dirname(BASE_DIR), "src")
+
     FIND_BUG_MOCK = os.path.join(SRC_DIR, "find_bug_mock.py")
     AUTO_PATCH = os.path.join(SRC_DIR, "auto_patch.py")
 
+    # Debug info (remove later if not needed)
+    st.caption(f"📂 Searching mock script at: {FIND_BUG_MOCK}")
+
+    # File uploader
     uploaded = st.file_uploader("Upload C file (small)", type=["c"])
     if not uploaded:
         st.info("Upload a C file (use the provided `bugprog.c` for demo).")
@@ -113,12 +124,12 @@ def symbolic_execution_app():
     st.subheader("Uploaded Source")
     st.code(open(src_path).read(), language="c")
 
-    # Compile
+    # Compile uploaded C file
     st.subheader("🔧 Compiling Program")
     compile_proc = subprocess.run(["gcc", "-o", "bugprog", src_path],
                                   capture_output=True, text=True)
     if compile_proc.returncode != 0:
-        st.error("Compilation failed:\n" + compile_proc.stderr)
+        st.error("❌ Compilation failed:\n" + compile_proc.stderr)
         return
     else:
         st.success("✅ Compilation succeeded.")
@@ -130,7 +141,7 @@ def symbolic_execution_app():
                               capture_output=True, text=True)
         st.text("Mock Finder Output:\n" + mock.stdout)
     else:
-        st.error(f"Mock finder script not found at {FIND_BUG_MOCK}")
+        st.error(f"⚠️ Mock finder script not found at {FIND_BUG_MOCK}")
         return
 
     # Apply template patch
@@ -154,16 +165,17 @@ def symbolic_execution_app():
                                      capture_output=True, text=True)
                 st.text("Program Output:\n" + run.stdout + run.stderr)
             else:
-                st.error("Failed to compile fixed program:\n" + comp2.stderr)
+                st.error("❌ Failed to compile fixed program:\n" + comp2.stderr)
         else:
-            st.error("Patch did not generate bugprog_fixed.c")
+            st.error("❌ Patch did not generate bugprog_fixed.c")
     else:
-        st.error(f"Auto patch script not found at {AUTO_PATCH}")
+        st.error(f"⚠️ Auto patch script not found at {AUTO_PATCH}")
 
 
 # ------------------ MAIN CONTROL FLOW ------------------
 if "page" not in st.session_state:
     st.session_state["page"] = "login"
+
 if "user" in st.session_state:
     symbolic_execution_app()
 elif st.session_state["page"] == "login":
